@@ -38,6 +38,13 @@ cd "path to your project"
 docker-compose up -d --build
 
 Step 5 create Controller 
+echo "# PAOB" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin git@github.com:MITOM06/PAOB.git
+git push -u origin main
 
 
 

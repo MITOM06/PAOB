@@ -3,16 +3,15 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class CategoryRequest extends FormRequest
+class RegisterRequest extends FormRequest
 {
     public function authorize() { return true; }
     public function rules()
     {
         return [
             'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255|unique:categories,slug,' . $this->route('category'),
-            'description' => 'nullable|string',
-            'image' => 'nullable|image|max:5120',
+            'email'=> 'required|email|unique:users,email',
+            'password' => 'required|string|min:6|confirmed',
         ];
     }
 }

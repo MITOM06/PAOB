@@ -1,65 +1,67 @@
 <?php
-
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\OrderRequest;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(Request $r)
     {
-        //
+        $user = $r->user();
+        if ($user->hasRole('admin')) {
+            $orders = Order::with('items.product','user')->paginate(20);
+        } else {
+            $orders = $user->orders()->with('items.product')->paginate(20);
+        }
+        return response()->json(['success'=>true,'data'=>$orders]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function store(OrderRequest $request)
     {
-        //
+        $user = $request->user();
+        $items = $request->validated()['items'];
+
+        DB::beginTransaction();
+        try {
+            $total = 0;
+            $order = Order::create(['user_id'=>$user->id,'total'=>0,'status'=>'pending']);
+
+            foreach ($items as $it) {
+                $product = Product::findOrFail($it['product_id']);
+                $price = $product->price;
+                $qty = $it['quantity'];
+                $total += $price * $qty;
+                $order->items()->create([
+                    'product_id'=>$product->id,
+                    'price'=>$price,
+                    'quantity'=>$qty,
+                    'meta'=>['title'=>$product->title]
+                ]);
+            }
+
+            $order->update(['total'=>$total,'status'=>'paid']); // adjust status based on your flow
+            DB::commit();
+            return response()->json(['success'=>true,'data'=>$order->load('items.product')],201);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            report($e);
+            return response()->json(['success'=>false,'message'=>'Could not create order'],500);
+        }
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function show(Request $r, Order $order)
     {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        $user = $r->user();
+        if (!$user->hasRole('admin') && $order->user_id !== $user->id) {
+            return response()->json(['success'=>false,'message'=>'Unauthorized'],403);
+        }
+        $order->load('items.product');
+        return response()->json(['success'=>true,'data'=>$order]);
     }
 }

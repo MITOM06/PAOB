@@ -2,129 +2,49 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\RegisterRequest;
+use App\Http\Requests\LoginRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-    /**
-     * Đăng ký tài khoản mới
-     */
-    public function register(Request $request)
+    public function register(RegisterRequest $request)
     {
-        // Validate dữ liệu đầu vào
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-        ], [
-            'name.required' => 'Tên là bắt buộc',
-            'email.required' => 'Email là bắt buộc',
-            'email.unique' => 'Email đã được sử dụng',
-            'password.min' => 'Mật khẩu phải ít nhất 8 ký tự',
-            'password.confirmed' => 'Xác nhận mật khẩu không khớp',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Dữ liệu không hợp lệ',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        // Tạo user mới
+        $data = $request->validated();
         $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
+            'name'=>$data['name'],
+            'email'=>$data['email'],
+            'password'=>Hash::make($data['password']),
         ]);
-
-        // Tạo token cho user
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Đăng ký thành công',
-            'data' => [
-                'user' => $user,
-                'access_token' => $token,
-                'token_type' => 'Bearer'
-            ]
-        ], 201);
+        $token = $user->createToken('api-token')->plainTextToken;
+        return response()->json(['success'=>true,'data'=>['user'=>$user,'token'=>$token]],201);
     }
 
-    /**
-     * Đăng nhập
-     */
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|string|email',
-            'password' => 'required|string',
-        ], [
-            'email.required' => 'Email là bắt buộc',
-            'password.required' => 'Mật khẩu là bắt buộc',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Dữ liệu không hợp lệ',
-                'errors' => $validator->errors()
-            ], 422);
+        $data = $request->validated();
+        $user = User::where('email',$data['email'])->first();
+        if (!$user || !Hash::check($data['password'],$user->password)) {
+            return response()->json(['success'=>false,'message'=>'Email hoặc mật khẩu không đúng'],401);
         }
-
-        // Kiểm tra thông tin đăng nhập
-        if (!Auth::attempt($request->only('email', 'password'))) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Email hoặc mật khẩu không đúng'
-            ], 401);
-        }
-
-        $user = User::where('email', $request->email)->firstOrFail();
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Đăng nhập thành công',
-            'data' => [
-                'user' => $user,
-                'access_token' => $token,
-                'token_type' => 'Bearer',
-                'subscription_level' => $user->getCurrentSubscriptionLevel()
-            ]
-        ]);
+        $token = $user->createToken('api-token')->plainTextToken;
+        return response()->json(['success'=>true,'data'=>['user'=>$user,'token'=>$token]]);
     }
 
-    /**
-     * Đăng xuất
-     */
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Đăng xuất thành công'
-        ]);
+        $user = $request->user();
+        if ($user && $request->bearerToken()) {
+            $user->currentAccessToken()->delete();
+        }
+        return response()->json(['success'=>true,'message'=>'Đã đăng xuất']);
     }
 
-    /**
-     * Lấy thông tin user hiện tại
-     */
     public function me(Request $request)
     {
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'user' => $request->user(),
-                'subscription_level' => $request->user()->getCurrentSubscriptionLevel()
-            ]
-        ]);
+        $user = $request->user();
+        return response()->json(['success'=>true,'data'=>['user'=>$user,'subscription_level'=>$user->getCurrentSubscriptionLevel()]]);
     }
 }

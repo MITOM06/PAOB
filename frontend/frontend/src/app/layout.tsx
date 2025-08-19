@@ -1,38 +1,22 @@
-// frontend/src/app/layout.tsx
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
-import { AuthProvider } from '@/contexts/AuthContext'
-import { Toaster } from 'react-hot-toast'
+import React from 'react'
+import Header from '@/components/Header'
+import Footer from '@/components/Footer'
 
-const inter = Inter({ subsets: ['latin'] })
-
-export const metadata: Metadata = {
-  title: 'EBook Platform - Nền tảng sách điện tử',
-  description: 'Nền tảng bán sách điện tử, podcast và khóa học online',
+export const metadata = {
+  title: 'Ebook & Podcast Demo',
+  description: 'Demo platform for ebooks and podcasts — copy + customize',
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
-      <body className={inter.className}>
-        <AuthProvider>
-          {children}
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              duration: 3000,
-              style: {
-                background: '#363636',
-                color: '#fff',
-              },
-            }}
-          />
-        </AuthProvider>
+      <body className="min-h-screen">
+        <Header />
+        <main className="pt-6 pb-20">
+          <div className="container-max">{children}</div>
+        </main>
+        <Footer />
       </body>
     </html>
   )

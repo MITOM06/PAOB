@@ -1,8 +1,9 @@
 <?php
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
 
 class Product extends Model
 {
@@ -11,62 +12,35 @@ class Product extends Model
     protected $fillable = [
         'title',
         'slug',
-        'description', 
-        'content',
+        'description',
         'price',
-        'discount_price',
-        'cover_image',
-        'type',
-        'status',
-        'author',
-        'duration',
-        'tags',
-        'subscription_level',
-        'category_id'
+        'brand',
+        'category_id',
+        'is_published',
+        'access_level' // free/basic/premium/vip
     ];
 
     protected $casts = [
-        'tags' => 'array',
-        'price' => 'decimal:2',
-        'discount_price' => 'decimal:2'
+        'is_published' => 'boolean',
+        'price' => 'decimal:2'
     ];
 
-    // Relationship: Sản phẩm thuộc một danh mục
     public function category()
     {
         return $this->belongsTo(Category::class);
     }
 
-    // Relationship: Sản phẩm có nhiều files
     public function files()
     {
         return $this->hasMany(ProductFile::class);
     }
 
-    // Relationship: Sản phẩm có trong nhiều đơn hàng
-    public function orderItems()
+    protected static function booted()
     {
-        return $this->hasMany(OrderItem::class);
-    }
-
-    // Accessor: Tính giá cuối cùng
-    public function getFinalPriceAttribute()
-    {
-        return $this->discount_price ?? $this->price;
-    }
-
-    // Scope: Sản phẩm active
-    public function scopeActive($query)
-    {
-        return $query->where('status', 'active');
-    }
-
-    // Scope: Theo cấp độ thành viên
-    public function scopeBySubscriptionLevel($query, $level)
-    {
-        $levels = ['free', 'basic', 'premium', 'vip'];
-        $userLevelIndex = array_search($level, $levels);
-        
-        return $query->whereIn('subscription_level', array_slice($levels, 0, $userLevelIndex + 1));
+        static::creating(function ($m) {
+            if (empty($m->slug) && !empty($m->title)) {
+                $m->slug = Str::slug($m->title);
+            }
+        });
     }
 }

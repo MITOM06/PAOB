@@ -1,29 +1,28 @@
 <?php
 namespace App\Models;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
 
 class Category extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'name',
-        'slug', 
-        'description',
-        'type',
-        'image'
-    ];
+    protected $fillable = ['name','slug','description','image','type'];
 
-    // Relationship: Một danh mục có nhiều sản phẩm
     public function products()
     {
         return $this->hasMany(Product::class);
     }
 
-    // Scope: Lọc theo loại
-    public function scopeByType($query, $type)
+    // Auto-generate slug if not provided
+    protected static function booted()
     {
-        return $query->where('type', $type);
+        static::creating(function ($model) {
+            if (empty($model->slug) && !empty($model->name)) {
+                $model->slug = Str::slug($model->name);
+            }
+        });
     }
 }

@@ -2,44 +2,57 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    // app/Models/User.php - Thêm vào class User hiện có
-public function orders()
-{
-    return $this->hasMany(Order::class);
-}
+    use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
-public function subscriptions()
-{
-    return $this->hasMany(UserSubscription::class);
-}
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+        'avatar',
+        'subscription_level',
+    ];
 
-// Kiểm tra cấp độ thành viên hiện tại
-public function getCurrentSubscriptionLevel()
-{
-    $activeSubscription = $this->subscriptions()
-        ->where('status', 'active')
-        ->where('expires_at', '>', now())
-        ->orderBy('expires_at', 'desc')
-        ->first();
-    
-    return $activeSubscription ? $activeSubscription->plan : 'free';
-}
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
 
-// Kiểm tra có thể truy cập sản phẩm không
-public function canAccessProduct(Product $product)
-{
-    $userLevel = $this->getCurrentSubscriptionLevel();
-    $levels = ['free', 'basic', 'premium', 'vip'];
-    
-    $userLevelIndex = array_search($userLevel, $levels);
-    $productLevelIndex = array_search($product->subscription_level, $levels);
-    
-    return $userLevelIndex >= $productLevelIndex;
-}
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+    ];
+
+    // Relations
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    // Subscription level helper
+    public function getCurrentSubscriptionLevel(): string
+    {
+        return $this->subscription_level ?? 'free';
+    }
+
+    public function canAccessProduct($product): bool
+    {
+        $levels = ['free', 'basic', 'premium', 'vip'];
+
+        $userLevel = $this->getCurrentSubscriptionLevel();
+        $userIndex = array_search($userLevel, $levels, true);
+        $userIndex = $userIndex === false ? 0 : $userIndex;
+
+        $productLevel = data_get($product, 'access_level', data_get($product, 'level', 'free'));
+        $productIndex = array_search($productLevel, $levels, true);
+        $productIndex = $productIndex === false ? 0 : $productIndex;
+
+        return $userIndex >= $productIndex;
+    }
 }

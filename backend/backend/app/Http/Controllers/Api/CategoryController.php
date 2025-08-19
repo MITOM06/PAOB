@@ -2,182 +2,49 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CategoryRequest;
 use App\Models\Category;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 
 class CategoryController extends Controller
 {
-    /**
-     * Lấy danh sách categories
-     */
-    public function index(Request $request)
+    public function index(Request $r)
     {
-        $query = Category::query();
-
-        // Filter theo type nếu có
-        if ($request->has('type')) {
-            $query->where('type', $request->type);
-        }
-
-        // Search theo tên
-        if ($request->has('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%');
-        }
-
-        $categories = $query->with('products')->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $categories
-        ]);
+        $q = Category::query();
+        if ($r->has('type')) $q->where('type',$r->type);
+        return response()->json(['success'=>true,'data'=>$q->paginate(20)]);
     }
 
-    /**
-     * Tạo category mới (Admin only)
-     */
-    public function store(Request $request)
+    public function show(Category $category)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'type' => 'required|in:ebook,podcast,course',
-            'description' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
-        ]);
+        return response()->json(['success'=>true,'data'=>$category]);
+    }
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $categoryData = [
-            'name' => $request->name,
-            'slug' => Str::slug($request->name),
-            'type' => $request->type,
-            'description' => $request->description,
-        ];
-
-        // Xử lý upload image
+    public function store(CategoryRequest $request)
+    {
+        $data = $request->validated();
         if ($request->hasFile('image')) {
-            $image = $request->file('image');
-            $imageName = time() . '_' . $image->getClientOriginalName();
-            $image->storeAs('public/categories', $imageName);
-            $categoryData['image'] = 'storage/categories/' . $imageName;
+            $path = $request->file('image')->store('categories','public');
+            $data['image'] = $path;
         }
-
-        $category = Category::create($categoryData);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Tạo danh mục thành công',
-            'data' => $category
-        ], 201);
+        $category = Category::create($data);
+        return response()->json(['success'=>true,'data'=>$category],201);
     }
 
-    /**
-     * Lấy chi tiết category
-     */
-    public function show($id)
+    public function update(CategoryRequest $request, Category $category)
     {
-        $category = Category::with(['products' => function($query) {
-            $query->active()->with('files');
-        }])->find($id);
-
-        if (!$category) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Không tìm thấy danh mục'
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'data' => $category
-        ]);
-    }
-
-    /**
-     * Cập nhật category
-     */
-    public function update(Request $request, $id)
-    {
-        $category = Category::find($id);
-        
-        if (!$category) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Không tìm thấy danh mục'
-            ], 404);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'type' => 'required|in:ebook,podcast,course',
-            'description' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $updateData = [
-            'name' => $request->name,
-            'slug' => Str::slug($request->name),
-            'type' => $request->type,
-            'description' => $request->description,
-        ];
-
-        // Xử lý upload image mới
+        $data = $request->validated();
         if ($request->hasFile('image')) {
-            $image = $request->file('image');
-            $imageName = time() . '_' . $image->getClientOriginalName();
-            $image->storeAs('public/categories', $imageName);
-            $updateData['image'] = 'storage/categories/' . $imageName;
+            $path = $request->file('image')->store('categories','public');
+            $data['image'] = $path;
         }
-
-        $category->update($updateData);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Cập nhật danh mục thành công',
-            'data' => $category
-        ]);
+        $category->update($data);
+        return response()->json(['success'=>true,'data'=>$category]);
     }
 
-    /**
-     * Xóa category
-     */
-    public function destroy($id)
+    public function destroy(Category $category)
     {
-        $category = Category::find($id);
-        
-        if (!$category) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Không tìm thấy danh mục'
-            ], 404);
-        }
-
-        // Kiểm tra xem category có products không
-        if ($category->products()->count() > 0) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Không thể xóa danh mục có sản phẩm'
-            ], 422);
-        }
-
         $category->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Xóa danh mục thành công'
-        ]);
+        return response()->json(['success'=>true,'message'=>'Deleted']);
     }
 }
